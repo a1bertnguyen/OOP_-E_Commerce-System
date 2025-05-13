@@ -1,18 +1,6 @@
 package Model;
 
 public class Product {
-    /**
-     * Constructs a product object.
-     * 
-     * @param proId           Product ID (must be unique)
-     * @param proModel        Product model
-     * @param proCategory     Product category
-     * @param proName         Product name
-     * @param proCurrentPrice Current price of the product
-     * @param proRawPrice     Original price of the product
-     * @param proDiscount     Discount percentage
-     * @param proLikesCount   Number of likes
-     */
     private String proId;
     private String proModel;
     private String proCategory;

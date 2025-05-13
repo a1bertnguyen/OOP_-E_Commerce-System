@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 public class UserOperation {
     private static UserOperation instance = null;
-    private static final String DATA_FILE  = "src/Resources/data.txt";
+    public static final String DATA_FILE  = "src/Resources/data.txt";
     private final Random random = new Random();
 
     private UserOperation() {
@@ -176,6 +176,8 @@ public class UserOperation {
          * 0 1 0^ 2 3 1^ 4 5 2^
          * ^: user password arrays
          */
+
+         // [a-zA-z_][0-9]
         String chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; // random String
         Random rand = new Random();
         StringBuilder randomPassword = new StringBuilder();

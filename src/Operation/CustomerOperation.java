@@ -1,10 +1,14 @@
 package Operation;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.regex.Pattern;
-
 import Model.Customer;
+import Model.CustomerListResult;
+import Model.User;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class CustomerOperation {
     private static CustomerOperation instance = null;
@@ -45,25 +49,25 @@ public class CustomerOperation {
     String userEmail, String userMobile) {
         if (!userOperation.validateUsername(userName)) {
             System.err.println("Sign up for failure: The username is invalid.");
-            return (Boolean) null;
+            return false;
         }
         if (userOperation.checkUsernameExist(userName)) {
             System.err.println("Sign up for failure: Username '" + userName + "' exists.");
-            return (Boolean) null;
+            return false;
         }
         if (!userOperation.validatePassword(userPassword)) {
             System.err.println("Sign up for failure: Valid password.");
-            return (Boolean) null;
+            return false;
         }
         
         // Check email and phone
         if (!validateEmail(userEmail)) {
             System.err.println("Sign up for failure: invalid email.");
-            return (Boolean) null;
+            return false;
         }
         if (!validateMobile(userMobile)) {
             System.err.println("Sign up for failure: invalid phone number.");
-            return (Boolean) null;
+            return false;
         }
 
         
@@ -74,9 +78,13 @@ public class CustomerOperation {
         Customer newCustomer = new Customer(userId, userName, encryptedPassword, 
                         registerTime, "customer", userEmail, userMobile);
 
-        userOperation.addUser(newCustomer);
-
-        return newCustomer;
+        boolean success = userOperation.addUser(newCustomer);
+        if (success) {
+            System.out.println("Customer '" + userName + "' registered successfully.");
+        } else {
+            System.err.println("Registration failed: Could not add customer to data file.");
+        }
+        return success;
     }
 
     public boolean updateProfile(String attributeName, String value, Customer customerObject) {
@@ -152,7 +160,37 @@ public class CustomerOperation {
     * @return true if deleted, false if failed
     */
     public boolean deleteCustomer(String customerId) {
-    // Implementation
+        if (customerId == null || customerId.trim().isEmpty()) {
+            System.err.println("Deletion failed: Invalid customer ID provided.");
+            return false;
+        }
+        String trimmedId = customerId.trim();
+
+        // Verify the user exists and is actually a Customer before deleting
+        User userToDelete = userOperation.getAllUsers().stream()
+                .filter(u -> u.getUserId().equals(trimmedId))
+                .findFirst()
+                .orElse(null);
+
+        if (userToDelete == null) {
+            System.err.println("Deletion failed: User with ID '" + trimmedId + "' not found.");
+            return false;
+        }
+
+        if (!(userToDelete instanceof Customer)) {
+            System.err.println("Deletion failed: User with ID '" + trimmedId + "' is not a customer.");
+            return false;
+        }
+
+        // Delegate the file deletion (read-filter-overwrite) to UserOperation
+        boolean success = userOperation.deleteUser(trimmedId);
+         if (!success) {
+             // UserOperation's deleteUser already prints an error if not found during its process
+              System.err.println("Deletion failed: Could not remove customer '" + trimmedId + "' from data file.");
+         } else {
+              System.out.println("Customer with ID '" + trimmedId + "' deleted successfully.");
+         }
+        return success;
     }
 
     /**
@@ -163,15 +201,69 @@ public class CustomerOperation {
     pages
     */
     public CustomerListResult getCustomerList(int pageNumber) {
-    // Implementation
+        final int PAGE_SIZE = 10;
+
+        // Get all users from UserOperation 
+        List<User> allUsers = userOperation.getAllUsers();
+
+        // Filter to get only Customer objects
+        List<Customer> allCustomers = allUsers.stream()
+                .filter(user -> user instanceof Customer)
+                .map(user -> (Customer) user)
+                .collect(Collectors.toList());
+
+        // Handle empty customer list
+        if (allCustomers.isEmpty()) {
+            return new CustomerListResult(new ArrayList<>(), 0, 0);
+        }
+
+        // Calculate pagination details
+        int totalCustomers = allCustomers.size();
+        int totalPages = (int) Math.ceil((double) totalCustomers / PAGE_SIZE);
+
+        // Validate pageNumber
+        if (pageNumber < 1 || pageNumber > totalPages) {
+            // Return result indicating invalid page, but provide total pages info
+            return new CustomerListResult(new ArrayList<>(), pageNumber, totalPages);
+        }
+
+        // Calculate indices for the sublist
+        int startIndex = (pageNumber - 1) * PAGE_SIZE;
+        // endIndex is exclusive, ensure it doesn't exceed list size
+        int endIndex = Math.min(startIndex + PAGE_SIZE, totalCustomers);
+
+        // Get the sublist for the requested page
+        List<Customer> pageOfCustomers = allCustomers.subList(startIndex, endIndex);
+
+        // Return the result object
+        return new CustomerListResult(pageOfCustomers, pageNumber, totalPages);
     }
 
     /**
     * Removes all the customers from the data/users.txt file.
     */
     public void deleteAllCustomers() {
-    // Implementation
-    }
+        List<User> allUsers = userOperation.getAllUsers();
+        List<Customer> customersToDelete = allUsers.stream()
+                .filter(user -> user instanceof Customer)
+                .map(user -> (Customer) user)
+                .collect(Collectors.toList());
 
+        if (customersToDelete.isEmpty()) {
+            System.out.println("No customers found to delete.");
+            return;
+        }
+
+        System.out.println("Attempting to delete " + customersToDelete.size() + " customers...");
+        int successfulDeletions = 0;
+
+        for (Customer customer : customersToDelete) {
+            if (userOperation.deleteUser(customer.getUserId())) {
+                successfulDeletions++;
+            }
+        }
+
+        System.out.println("Successfully deleted " + successfulDeletions + " out of " + customersToDelete.size() + " customers.");
+    }
 
 }

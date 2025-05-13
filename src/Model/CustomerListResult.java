@@ -3,7 +3,7 @@ import java.util.ArrayList;
 import java.util.List; 
 
 
-class CustomerListResult {
+public class CustomerListResult {
     List<Customer> customers; // List customer in current page
     int currentPage;          // Start at 1
     int totalPages;           
