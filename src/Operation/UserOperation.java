@@ -1,23 +1,27 @@
 package Operation;
 
 import Model.*;
-
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class UserOperation {
-
-    /**
-     * Returns the single instance of UserOperation.
-     * 
-     * @return UserOperation instance
-     */
     private static UserOperation instance = null;
-    private static final String FILE = "src/Resources/data.txt";
+    private static final String DATA_FILE  = "src/Resources/data.txt";
+    private final Random random = new Random();
+
+    private UserOperation() {
+        ensureDataFileExists();
+    }
 
     // Singalton in JAVA
-    public static UserOperation getInstance() {
-
+    public static synchronized UserOperation getInstance() {
         if (instance == null) {
             instance = new UserOperation();
         }
@@ -25,58 +29,143 @@ public class UserOperation {
         return instance;
     }
 
-    /**
-     * Generates and returns a 10-digit unique user id starting with 'u_'
-     * every time when a new user is registered.
-     * 
-     * @return A string value in the format 'u_10digits', e.g., 'u_1234567890'
-     */
+    //MANAGE FILE
+    static class FileUtil {
+        public static List<String> readLines(String filePathStr) {
+            Path filePath = Paths.get(filePathStr);
+            List<String> lines = new ArrayList<>();
+            if (!Files.exists(filePath)) {
+                 System.err.println("Error: File does not exist at the path: " + filePathStr);
+                return lines; // Get empty
+            }
+            try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    lines.add(line);
+                }
+            } catch (IOException e) {
+                System.err.println("Fail to read file " + filePathStr + ": " + e.getMessage());
+            }
+            return lines;
+        }
+     
+        public static void writeLines(String filePathStr, List<String> lines, boolean append) {
+             Path filePath = Paths.get(filePathStr);
+             Path parentDir = filePath.getParent();
 
+             if (parentDir != null && !Files.exists(parentDir)) {
+                 try {
+                     Files.createDirectories(parentDir);
+                 } catch (IOException e) {
+                      System.err.println("Error when creating a parent path for the file " + filePathStr + ": " + e.getMessage());
+                      return; 
+                 }
+             }
+
+             try (BufferedWriter writer = Files.newBufferedWriter(filePath,
+                     append ? StandardOpenOption.APPEND : StandardOpenOption.CREATE,
+                     StandardOpenOption.WRITE,
+                     append ? StandardOpenOption.CREATE: StandardOpenOption.TRUNCATE_EXISTING // Ghi đè nếu không append || tạo nếu chưa có
+                )) 
+                {
+                 for (int i = 0; i < lines.size(); i++) {
+                    writer.write(lines.get(i));
+                    writer.newLine();
+                    }
+                } catch (IOException e) {
+                 System.err.println("Error when recorded in the file " + filePathStr + ": " + e.getMessage());
+             }
+        }
+
+         public static void ensureDataFileExists() {
+             Path filePath = Paths.get(DATA_FILE);
+             if (!Files.exists(filePath)) {
+                Path parentDir = filePath.getParent();
+                 if (parentDir != null && !Files.exists(parentDir)) {
+                     try {
+                         Files.createDirectories(parentDir);
+                     } catch (IOException e) {
+                          System.err.println("Error when creating a parent path for the file " + DATA_FILE + ": " + e.getMessage());
+                     }
+                 }
+                 try {
+                     Files.createFile(filePath);
+                      System.out.println("Created data files: " + DATA_FILE);
+                 } catch (IOException e) {
+                     System.err.println("Error when creating data files " + DATA_FILE + ": " + e.getMessage());
+                 }
+             }
+         }
+    }
+
+    static class SimpleJsonParser {
+         public static Map<String, String> parse(String jsonLikeString) {
+            Map<String, String> map = new HashMap<>();
+            if (jsonLikeString == null || !jsonLikeString.startsWith("{") || !jsonLikeString.endsWith("}")) {
+                return map;
+            }
+            String content = jsonLikeString.substring(1, jsonLikeString.length() - 1).trim();
+            Pattern pattern = Pattern.compile("\"([^\"]*)\":(?:\"([^\"]*)\"|([^,\"]*))");
+            Matcher matcher = pattern.matcher(content);
+            while (matcher.find()) {
+                String key = matcher.group(1);
+                 // Group (2) is quotes, group (3) is a value without quotes (number, boolean)
+                String value = matcher.group(2) != null ? matcher.group(2) : matcher.group(3);
+                map.put(key, value);
+            }
+            return map;
+        }
+    }
+    // MANAGE FILE
+    private void ensureDataFileExists() {
+         FileUtil.ensureDataFileExists();
+    }
+
+    // Read with no parse
+    private List<String> loadAllLinesFromFile() {
+        return FileUtil.readLines(DATA_FILE);
+    }
+
+    // Take list Users
+    public List<User> getAllUsers() {
+        List<String> allLines = loadAllLinesFromFile();
+        List<User> users = new ArrayList<>();
+        for (String line : allLines) {
+            // Identify the line is User (must have user_id and user_name)
+            if (line.contains("\"user_id\":") && line.contains("\"user_name\":")) {
+                Map<String, String> data = SimpleJsonParser.parse(line);
+                if (!data.isEmpty()) {
+                    String role = data.getOrDefault("user_role", "customer").toLowerCase();
+                    try {
+                        if ("admin".equals(role)) {
+                            users.add(parseAdmin(data));
+                        } else {
+                            users.add(parseCustomer(data));
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Ignore the user line parse error: " + line + " Error: " + e.getMessage());
+                    }
+                }
+            }
+        }
+        return users;
+    }
+    
     // RES: https://www.geeksforgeeks.org/java-io-bufferedreader-class-java/
     public String generateUniqueUserId() {
-        Random rand = new Random();
-        String id;
+        List<User> existingUsers = getAllUsers(); 
+        Set<String> existingIds = existingUsers.stream()
+                                                .map(User::getUserId)
+                                                .collect(Collectors.toSet());
+        String newId;
         do {
-            long number = 1000000000L + rand.nextLong(9000000000L);
-            id = "u_" + number;
-        } while (checkUserIdExist(id)); // true continue false break
-
-        return id;
+            long number = 1_000_000_000L + random.nextLong(9_000_000_000L);
+            newId = "u_" + number;
+        } while (existingIds.contains(newId));
+        return newId;
 
     }
 
-    private boolean checkUserIdExist(String userId) {
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILE))) { // we use BufferedReader to read line
-                                                                                 // instead of read per letters
-            String line;
-            while ((line = reader.readLine()) != null) { // read all line in the text
-                if (line.contains("\"user_id\":\"" + userId + "\""))
-                    return true;
-            }
-        } catch (IOException e) { // print the error
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-    /**
-     * Encode a user-provided password.
-     * Encryption steps:
-     * 
-     * 1. Generate a random string with a length equal to two times
-     * the length of the user-provided password. The random string
-     * should consist of characters chosen from a-zA-Z0-9.
-     * 
-     * 2. Combine the random string and the input password text to
-     * create an encrypted password, following the rule of selecting
-     * two letters sequentially from the random string and
-     * appending one letter from the input password. Repeat until all
-     * characters in the password are encrypted. Finally, add "^^" at
-     * the beginning and "$$" at the end of the encrypted password.
-     *
-     * @param userPassword The password to encrypt
-     * @return Encrypted password
-     */
     public String encryptPassword(String userPassword) {
         /*
          * ex:
@@ -106,14 +195,6 @@ public class UserOperation {
 
     }
 
-    /**
-     * Decode the encrypted password with a similar rule as the encryption
-     * method.
-     * 
-     * @param encryptedPassword The encrypted password to decrypt
-     * @return Original user-provided password
-     */
-
     public String decryptPassword(String encryptedPassword) {
         /*
          * encrypted password: ^^Xpax7bKqc$$
@@ -133,137 +214,173 @@ public class UserOperation {
         return decrypted.toString();
     }
 
-    /**
-     * Verify whether a user is already registered or exists in the system.
-     * 
-     * @param userName The username to check
-     * @return true if exists, false otherwise
-     */
+    // Convert to string and check with the value import
+    private boolean checkUserIdExist(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return false;
+        return getAllUsers().stream()
+                            .anyMatch(user -> user.getUserId().equals(userId.trim()));
+    }
+
     public boolean checkUsernameExist(String userName) {
-        // similar with check UserID
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILE))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.contains("\"user_name\":\"" + userName + "\""))
-                    return true;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (userName == null || userName.trim().isEmpty()) return false;
+        return getAllUsers().stream() // Joint in Python
+                            .anyMatch(user -> user.getUserName().equalsIgnoreCase(userName.trim())); //Lambda in Python
+    }
+
+    public boolean validateUsername(String userName) {
+        if (userName == null || userName.length() < 5) return false;
+        return userName.matches("^[a-zA-Z_]{5,}$");
+    }
+
+    public boolean validatePassword(String userPassword) {
+        if (userPassword == null || userPassword.length() < 5) return false;
+        boolean hasLetter = false;
+        boolean hasDigit = false;
+        for (char c : userPassword.toCharArray()) {
+            if (Character.isLetter(c)) hasLetter = true;
+            if (Character.isDigit(c)) hasDigit = true;
+            if (hasLetter && hasDigit) return true;
         }
         return false;
     }
 
-    /**
-     * Validate the user's name. The name should only contain letters or
-     * underscores, and its length should be at least 5 characters.
-     * 
-     * @param userName The username to validate
-     * @return true if valid, false otherwise
-     */
-    public boolean validateUsername(String userName) {
-        if (userName == null || userName.length() < 5)
-            return false;
-        for (char c : userName.toCharArray()) {
-            if (!(Character.isLetter(c))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Validate the user's password. The password should contain at least
-     * one letter (uppercase or lowercase) and one number. The length
-     * must be greater than or equal to 5 characters.
-     * 
-     * @param userPassword The password to validate
-     * @return true if valid, false otherwise
-     */
-    public boolean validatePassword(String userPassword) {
-        if (userPassword == null || userPassword.length() < 5)
-            return false;
-        boolean hasLetter = false;
-        boolean hasDigit = false;
-        for (char c : userPassword.toCharArray()) {
-            if (Character.isLetter(c))
-                hasLetter = true;
-            if (Character.isDigit(c))
-                hasDigit = true;
-        }
-        return hasLetter && hasDigit;
-    }
-
-    /**
-     * Verify the provided user's name and password combination against
-     * stored user data to determine the authorization status.
-     * 
-     * @param userName     The username for login
-     * @param userPassword The password for login
-     * @return A User object (Customer or Admin) if successful, null otherwise
-     */
     public User login(String userName, String userPassword) {
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILE))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.contains("\"user_name\":\"" + userName + "\"")) // find correct user
-                {
-                    String encrypted = line.split("\"user_password\":\"")[1].split("\"")[0];
-                    // take encrypted pass
-                    // ex: "user_password":"^^a1b2c3$$", -> ^^a1b2c3$$
-                    if (decryptPassword(encrypted).equals(userPassword)) { // decryptPassword
-                        if (line.contains("\"user_role\":\"admin\"")) {
-                            return parseAdmin(line);
-                        } else {
-                            return parseCustomer(line);
-                        }
-                    }
+        if (userName == null || userPassword == null) return null;
+        List<User> users = getAllUsers();
+        for (User user : users) {
+            if (user.getUserName().equalsIgnoreCase(userName)) {
+                String storedDecryptedPassword = decryptPassword(user.getUserPassword());
+                if (storedDecryptedPassword != null && storedDecryptedPassword.equals(userPassword)) {
+                    return user;
+                } else {
+                    return null;
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-        return null;
+        return null; 
     }
 
     /*
      * {"user_id":"u_123","user_name":"minh"}
      */
 
-    // CREATE THE ADMIN AND USER ROLE IN TXT.
-    private Admin parseAdmin(String json) {
-        String[] parts = json.replace("{", "").replace("}", "").split(",\s*");
-        // parts = ["\"user_id\":\"u_123\"", "\"user_name\":\"minh\""]
-
-        Map<String, String> map = new HashMap<>();
-        for (String part : parts) {
-            String[] kv = part.replace("\"", "") // "user_name:minh"
-                    .split(":"); // ["user_name", "minh"]
-
-            map.put(kv[0], kv[1]);
+    // CREATE THE ADMIN AND USER ROLE.
+     private Admin parseAdmin(Map<String, String> data) {
+        String userId = data.get("user_id");
+        String userName = data.get("user_name");
+        String password = data.get("user_password");
+        String regTime = data.get("user_register_time");
+        String role = data.getOrDefault("user_role", "admin");
+        if (userId == null || userName == null || password == null || regTime == null) {
+            throw new IllegalArgumentException("Missing information for Admin: " + data);
         }
-        return new Admin(
-                map.get("user_id"),
-                map.get("user_name"),
-                map.get("user_password"),
-                map.get("user_register_time"),
-                map.get("user_role"));
+        return new Admin(userId, userName, password, regTime, role);
     }
 
-    private Customer parseCustomer(String json) {
-        String[] parts = json.replace("{", "").replace("}", "").split(",\s*");
-        Map<String, String> map = new HashMap<>();
-        for (String part : parts) {
-            String[] kv = part.replace("\"", "").split(":");
-            map.put(kv[0], kv[1]);
+    private Customer parseCustomer(Map<String, String> data) {
+         String userId = data.get("user_id");
+        String userName = data.get("user_name");
+        String password = data.get("user_password");
+        String regTime = data.get("user_register_time");
+        String role = data.getOrDefault("user_role", "customer");
+        String email = data.getOrDefault("user_email", "");
+        String mobile = data.getOrDefault("user_mobile", "");
+         if (userId == null || userName == null || password == null || regTime == null) {
+            throw new IllegalArgumentException("Missing information for Customer: " + data);
         }
-        return new Customer(
-                map.get("user_id"),
-                map.get("user_name"),
-                map.get("user_password"),
-                map.get("user_register_time"),
-                map.get("user_role"),
-                map.get("user_email"),
-                map.get("user_mobile"));
+        return new Customer(userId, userName, password, regTime, role, email, mobile);
+    }
+
+    
+    public boolean addUser(User user) {
+        if (user == null) return false;
+
+        if (checkUserIdExist(user.getUserId()) || checkUsernameExist(user.getUserName())) {
+             System.err.println("Add user: ID or username existed.");
+             return false;
+        }
+        String userLine = user.toString(); 
+        FileUtil.writeLines(DATA_FILE, Collections.singletonList(userLine), true); // true = append
+        return true; 
+    }
+
+    // Read -> filter -> Write all file
+    public boolean updateUser(User userToUpdate) {
+        if (userToUpdate == null) return false;
+
+        List<String> allLines = loadAllLinesFromFile();
+        List<String> outputLines = new ArrayList<>();
+        boolean foundAndReplaced = false;
+        boolean usernameConflict = false;
+
+        // Check duplicate username
+         if (checkUsernameExist(userToUpdate.getUserName())) {
+             User existingUserWithSameName = getAllUsers().stream()
+                 .filter(u -> u.getUserName().equalsIgnoreCase(userToUpdate.getUserName()))
+                 .findFirst().orElse(null);
+             if (existingUserWithSameName != null && !existingUserWithSameName.getUserId().equals(userToUpdate.getUserId())) {
+                 usernameConflict = true;
+                 System.err.println("Failed Update: Username '" + userToUpdate.getUserName() + "' has been used by another user.");
+             }
+         }
+
+         if(usernameConflict){
+             return false; 
+         }
+
+
+        for (String line : allLines) {
+            if (line.contains("\"user_id\":") && line.contains("\"user_name\":")) {
+                 Map<String, String> data = SimpleJsonParser.parse(line);
+                 String currentUserId = data.get("user_id");
+                 if (currentUserId != null && currentUserId.equals(userToUpdate.getUserId())) {
+                     outputLines.add(userToUpdate.toString()); 
+                     foundAndReplaced = true;
+                 } else {
+                     outputLines.add(line);
+                 }
+            } else {
+                outputLines.add(line);
+            }
+        }
+
+        if (foundAndReplaced) {
+            FileUtil.writeLines(DATA_FILE, outputLines, false); // false = overwrite
+        } else {
+             System.err.println("Update error: No user ID found: " + userToUpdate.getUserId());
+        }
+        return foundAndReplaced;
+    }
+
+    public boolean deleteUser(String userIdToDelete) {
+         if (userIdToDelete == null || userIdToDelete.trim().isEmpty()) return false;
+
+        List<String> allLines = loadAllLinesFromFile();
+        List<String> outputLines = new ArrayList<>();
+        boolean foundAndDeleted = false;
+
+        for (String line : allLines) {
+             boolean shouldKeepLine = true;
+             if (line.contains("\"user_id\":") && line.contains("\"user_name\":")) {
+                  Map<String, String> data = SimpleJsonParser.parse(line);
+                  String currentUserId = data.get("user_id");
+                  
+                  if (currentUserId != null && currentUserId.equals(userIdToDelete)) {
+                      shouldKeepLine = false; //Mark to do not keep this line
+                      foundAndDeleted = true;
+                  }
+             }
+             if (shouldKeepLine) {
+                 outputLines.add(line); // Keep itit
+             }
+        }
+
+        if (foundAndDeleted) {
+            FileUtil.writeLines(DATA_FILE, outputLines, false); // false = overwrite
+        } else {
+             System.err.println("Error deletion: No user ID found:" + userIdToDelete);
+        }
+        return foundAndDeleted;
     }
 
 }
