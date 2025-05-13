@@ -12,9 +12,8 @@ import java.util.stream.Collectors;
 
 public class CustomerOperation {
     private static CustomerOperation instance = null;
-    private static final String FILE = "src/Resources/data.txt";
 
-    private UserOperation userOperation; //Dependecy on UserOperation
+    private final UserOperation userOperation; //Dependecy on UserOperation
 
     private CustomerOperation() {
         this.userOperation = UserOperation.getInstance();
@@ -150,7 +149,7 @@ public class CustomerOperation {
             return userOperation.updateUser(customerObject);
         }
 
-        return false;
+        return isValidUpdate;
     }
 
     /**

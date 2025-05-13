@@ -1,16 +1,21 @@
 package Operation;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import Model.Product;
 import Model.ProductListResult;
+
+import util.FileUtil; 
+import util.SimpleJsonParser;
 
 public class ProductOperation {
     private static  ProductOperation instance = null;
 
     private ProductOperation(){
-        UserOperation.FileUtil.ensureDataFileExists();
+        FileUtil.ensureDataFileExists();
     }
     public static synchronized  ProductOperation getInstance() {
         if (instance == null){
@@ -43,12 +48,29 @@ public class ProductOperation {
         }
     }
 
-    /**
-    * Extracts product information from the given product data files.
-    * The data is saved into the data/products.txt file.
-    */
+    // Set data for products
+    private List<Product> getAllProductsFromFile() {
+        List<String> allLines = FileUtil.readLines(FileUtil.DATA_FILE);
+        List<Product> products = new ArrayList<>();
+        for (String line : allLines) {
+            if (line.contains("\"pro_id\":") && line.contains("\"pro_name\":")) {
+                Map<String, String> data = SimpleJsonParser.parse(line);
+                Product product = parseProduct(data);
+                if (product != null) {
+                    products.add(product);
+                }
+            }
+        }
+        return products;
+    }
+    
     public void extractProductsFromFiles() {
-    // Implementation
+        List<Product> currentProducts = getAllProductsFromFile();
+        if (currentProducts.isEmpty()) {
+            System.out.println("No products found in the data file. Consider adding sample data or implementing data extraction.");
+        } else {
+            System.out.println(currentProducts.size() + " products currently exist in the data file.");
+        }
     }
 
     /**
@@ -58,7 +80,25 @@ public class ProductOperation {
     * @return A list of Product objects, current page number, and total pages
     */
     public ProductListResult getProductList(int pageNumber) {
-    // Implementation
+        final int PAGE_SIZE = 10;
+        List<Product> allProducts = getAllProductsFromFile();
+
+        if (allProducts.isEmpty()) {
+            return new ProductListResult(new ArrayList<>(), 0, 0);
+        }
+
+        int totalProducts = allProducts.size();
+        int totalPages = (int) Math.ceil((double) totalProducts / PAGE_SIZE);
+
+        if (pageNumber < 1 || pageNumber > totalPages) {
+            return new ProductListResult(new ArrayList<>(), pageNumber, totalPages);
+        }
+
+        int startIndex = (pageNumber - 1) * PAGE_SIZE;
+        int endIndex = Math.min(startIndex + PAGE_SIZE, totalProducts);
+        List<Product> pageOfProducts = allProducts.subList(startIndex, endIndex);
+
+        return new ProductListResult(pageOfProducts, pageNumber, totalPages);
     }
 
     /**
@@ -66,9 +106,26 @@ public class ProductOperation {
     * @param productId The ID of the product to delete
     * @return true if successful, false otherwise
     */
-    public boolean deleteProduct(String productId) {
-    // Implementation
+    private boolean shouldKeepProductLine(String line, String productId) {
+        return !line.contains("\"pro_id\":\"" + productId + "\"");
     }
+
+    public boolean deleteProduct(String productId) {
+        List<String> allLines = FileUtil.readLines(FileUtil.DATA_FILE);
+        List<String> filteredLines = allLines.stream()
+            .filter(line -> shouldKeepProductLine(line, productId))
+            .collect(Collectors.toList());
+
+        if (allLines.size() == filteredLines.size()) {
+            System.err.println("Product not found.");
+            return false;
+        }
+        
+        FileUtil.writeLines(FileUtil.DATA_FILE, filteredLines, false);
+        System.out.println("Product deleted.");
+        return true;
+}
+
 
     /**
     * Retrieves all products whose name contains the keyword (case insensitive).
@@ -76,7 +133,15 @@ public class ProductOperation {
     * @return A list of Product objects matching the keyword
     */
     public List<Product> getProductListByKeyword(String keyword) {
-    // Implementation
+         if (keyword == null || keyword.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String lowerCaseKeyword = keyword.trim().toLowerCase();
+        return getAllProductsFromFile().stream() // Joint
+                .filter(product -> product.getProName() != null &&
+                                   product.getProName().toLowerCase().contains(lowerCaseKeyword)) // Lambda
+                .collect(Collectors.toList()); // Combine
     }
 
     /**
@@ -85,7 +150,14 @@ public class ProductOperation {
     * @return A Product object or null if not found
     */
     public Product getProductById(String productId) {
-    // Implementation
+         if (productId == null || productId.trim().isEmpty()) {
+            return null;
+        }
+
+        String trimmedId = productId.trim();
+        return getAllProductsFromFile().stream()
+                .filter(product -> product.getProId().equals(trimmedId))
+                .findFirst().orElse(null);
     }
 
     /**
@@ -130,7 +202,12 @@ public class ProductOperation {
     * Removes all product data in the data/products.txt file.
     */
     public void deleteAllProducts() {
-    // Implementation
-    }
+    List<String> allLines = FileUtil.readLines(FileUtil.DATA_FILE);
+    List<String> filteredLines = allLines.stream()
+        .filter(line -> !line.contains("\"pro_id\":") || !line.contains("\"pro_name\":"))
+        .collect(Collectors.toList());
 
+    FileUtil.writeLines(FileUtil.DATA_FILE, filteredLines, false);
+    System.out.println("All products deleted from the file.");
+    }
 }

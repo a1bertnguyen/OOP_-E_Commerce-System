@@ -1,23 +1,18 @@
 package Operation;
 
 import Model.*;
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import util.FileUtil; 
+import util.SimpleJsonParser;
 
 public class UserOperation {
     private static UserOperation instance = null;
-    public static final String DATA_FILE  = "src/Resources/data.txt";
     private final Random random = new Random();
 
     private UserOperation() {
-        ensureDataFileExists();
+        FileUtil.ensureDataFileExists();
     }
 
     // Singalton in JAVA
@@ -29,101 +24,9 @@ public class UserOperation {
         return instance;
     }
 
-    //MANAGE FILE
-    static class FileUtil {
-        public static List<String> readLines(String filePathStr) {
-            Path filePath = Paths.get(filePathStr);
-            List<String> lines = new ArrayList<>();
-            if (!Files.exists(filePath)) {
-                 System.err.println("Error: File does not exist at the path: " + filePathStr);
-                return lines; // Get empty
-            }
-            try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    lines.add(line);
-                }
-            } catch (IOException e) {
-                System.err.println("Fail to read file " + filePathStr + ": " + e.getMessage());
-            }
-            return lines;
-        }
-     
-        public static void writeLines(String filePathStr, List<String> lines, boolean append) {
-             Path filePath = Paths.get(filePathStr);
-             Path parentDir = filePath.getParent();
-
-             if (parentDir != null && !Files.exists(parentDir)) {
-                 try {
-                     Files.createDirectories(parentDir);
-                 } catch (IOException e) {
-                      System.err.println("Error when creating a parent path for the file " + filePathStr + ": " + e.getMessage());
-                      return; 
-                 }
-             }
-
-             try (BufferedWriter writer = Files.newBufferedWriter(filePath,
-                     append ? StandardOpenOption.APPEND : StandardOpenOption.CREATE,
-                     StandardOpenOption.WRITE,
-                     append ? StandardOpenOption.CREATE: StandardOpenOption.TRUNCATE_EXISTING // Ghi đè nếu không append || tạo nếu chưa có
-                )) 
-                {
-                 for (int i = 0; i < lines.size(); i++) {
-                    writer.write(lines.get(i));
-                    writer.newLine();
-                    }
-                } catch (IOException e) {
-                 System.err.println("Error when recorded in the file " + filePathStr + ": " + e.getMessage());
-             }
-        }
-
-         public static void ensureDataFileExists() {
-             Path filePath = Paths.get(DATA_FILE);
-             if (!Files.exists(filePath)) {
-                Path parentDir = filePath.getParent();
-                 if (parentDir != null && !Files.exists(parentDir)) {
-                     try {
-                         Files.createDirectories(parentDir);
-                     } catch (IOException e) {
-                          System.err.println("Error when creating a parent path for the file " + DATA_FILE + ": " + e.getMessage());
-                     }
-                 }
-                 try {
-                     Files.createFile(filePath);
-                      System.out.println("Created data files: " + DATA_FILE);
-                 } catch (IOException e) {
-                     System.err.println("Error when creating data files " + DATA_FILE + ": " + e.getMessage());
-                 }
-             }
-         }
-    }
-
-    static class SimpleJsonParser {
-         public static Map<String, String> parse(String jsonLikeString) {
-            Map<String, String> map = new HashMap<>();
-            if (jsonLikeString == null || !jsonLikeString.startsWith("{") || !jsonLikeString.endsWith("}")) {
-                return map;
-            }
-            String content = jsonLikeString.substring(1, jsonLikeString.length() - 1).trim();
-            Pattern pattern = Pattern.compile("\"([^\"]*)\":(?:\"([^\"]*)\"|([^,\"]*))");
-            Matcher matcher = pattern.matcher(content);
-            while (matcher.find()) {
-                String key = matcher.group(1);
-                 // Group (2) is quotes, group (3) is a value without quotes (number, boolean)
-                String value = matcher.group(2) != null ? matcher.group(2) : matcher.group(3);
-                map.put(key, value);
-            }
-            return map;
-        }
-    }
-    // MANAGE FILE
-    private void ensureDataFileExists() {
-         FileUtil.ensureDataFileExists();
-    }
-
     // Read with no parse
     private List<String> loadAllLinesFromFile() {
-        return FileUtil.readLines(DATA_FILE);
+        return FileUtil.readLines(FileUtil.DATA_FILE);
     }
 
     // Take list Users
@@ -302,7 +205,7 @@ public class UserOperation {
              return false;
         }
         String userLine = user.toString(); 
-        FileUtil.writeLines(DATA_FILE, Collections.singletonList(userLine), true); // true = append
+        FileUtil.writeLines(FileUtil.DATA_FILE, Collections.singletonList(userLine), true); // true = append
         return true; 
     }
 
@@ -347,7 +250,7 @@ public class UserOperation {
         }
 
         if (foundAndReplaced) {
-            FileUtil.writeLines(DATA_FILE, outputLines, false); // false = overwrite
+            FileUtil.writeLines(FileUtil.DATA_FILE, outputLines, false); // false = overwrite
         } else {
              System.err.println("Update error: No user ID found: " + userToUpdate.getUserId());
         }
@@ -378,7 +281,7 @@ public class UserOperation {
         }
 
         if (foundAndDeleted) {
-            FileUtil.writeLines(DATA_FILE, outputLines, false); // false = overwrite
+            FileUtil.writeLines(FileUtil.DATA_FILE, outputLines, false); // false = overwrite
         } else {
              System.err.println("Error deletion: No user ID found:" + userIdToDelete);
         }
