@@ -1,6 +1,9 @@
 package Operation;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -10,6 +13,14 @@ import Model.ProductListResult;
 
 import util.FileUtil; 
 import util.SimpleJsonParser;
+
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartUtils;
+import org.jfree.chart.JFreeChart;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 
 public class ProductOperation {
     private static  ProductOperation instance = null;
@@ -166,8 +177,25 @@ public class ProductOperation {
     * Saves the figure into the data/figure folder.
     */
     public void generateCategoryFigure() {
-    // Implementation using Java charting library
+        List<Product> products = getAllProductsFromFile();
+        Map<String, Long> categoryCount = products.stream()
+            .collect(Collectors.groupingBy(Product::getProCategory, Collectors.counting()));
+
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        categoryCount.entrySet().stream()
+            .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue())) // Descending
+            .forEach(entry -> dataset.addValue(entry.getValue(), "Products", entry.getKey()));
+
+        JFreeChart barChart = ChartFactory.createBarChart(
+            "Number of Products per Category",
+            "Category",
+            "Product Count",
+            dataset
+        );
+
+        saveChartAsImage(barChart, "data/figure/category_bar_chart.png");
     }
+
     
     /**
     * Generates a pie chart showing the proportion of products that have
@@ -176,8 +204,24 @@ public class ProductOperation {
     * Saves the figure into the data/figure folder.
     */
     public void generateDiscountFigure() {
-    // Implementation using Java charting library
+        List<Product> products = getAllProductsFromFile();
+
+        long low = products.stream().filter(p -> p.getProDiscount() < 30).count();
+        long mid = products.stream().filter(p -> p.getProDiscount() >= 30 && p.getProDiscount() <= 60).count();
+        long high = products.stream().filter(p -> p.getProDiscount() > 60).count();
+
+        DefaultPieDataset dataset = new DefaultPieDataset();
+        dataset.setValue("Discount < 30", low);
+        dataset.setValue("30 ≤ Discount ≤ 60", mid);
+        dataset.setValue("Discount > 60", high);
+
+        JFreeChart pieChart = ChartFactory.createPieChart(
+            "Product Discount Distribution",
+            dataset, true, true, false);
+
+        saveChartAsImage(pieChart, "data/figure/discount_pie_chart.png");
     }
+
 
 
     /**
@@ -186,8 +230,29 @@ public class ProductOperation {
     * Saves the figure into the data/figure folder.
     */
     public void generateLikesCountFigure() {
-    // Implementation using Java charting library
+        List<Product> products = getAllProductsFromFile();
+
+        Map<String, Integer> categoryLikes = new HashMap<>();
+        for (Product p : products) {
+            categoryLikes.put(p.getProCategory(),
+                categoryLikes.getOrDefault(p.getProCategory(), 0) + p.getProLikesCount());
+        }
+
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        categoryLikes.entrySet().stream()
+            .sorted(Map.Entry.comparingByValue()) // Ascending
+            .forEach(entry -> dataset.addValue(entry.getValue(), "Likes", entry.getKey()));
+
+        JFreeChart chart = ChartFactory.createBarChart(
+            "Likes Count per Category",
+            "Category",
+            "Total Likes",
+            dataset
+        );
+
+        saveChartAsImage(chart, "data/figure/likes_count_chart.png");
     }
+
 
     /**
     * Generates a scatter chart showing the relationship between
@@ -195,8 +260,24 @@ public class ProductOperation {
     * Saves the figure into the data/figure folder.
     */
     public void generateDiscountLikesCountFigure() {
-    // Implementation using Java charting library
+        List<Product> products = getAllProductsFromFile();
+        XYSeries series = new XYSeries("Discount vs Likes");
+
+        for (Product p : products) {
+            series.add(p.getProDiscount(), p.getProLikesCount());
+        }
+
+        XYSeriesCollection dataset = new XYSeriesCollection(series);
+        JFreeChart chart = ChartFactory.createScatterPlot(
+            "Discount vs Likes Count",
+            "Discount (%)",
+            "Likes Count",
+            dataset
+        );
+
+        saveChartAsImage(chart, "data/figure/discount_likes_scatter.png");
     }
+
 
     /**
     * Removes all product data in the data/products.txt file.
@@ -210,4 +291,16 @@ public class ProductOperation {
     FileUtil.writeLines(FileUtil.DATA_FILE, filteredLines, false);
     System.out.println("All products deleted from the file.");
     }
+
+    private void saveChartAsImage(JFreeChart chart, String filePath) {
+        try {
+            File outputFile = new File(filePath);
+            outputFile.getParentFile().mkdirs();
+            ChartUtils.saveChartAsPNG(outputFile, chart, 800, 600);
+            System.out.println("Chart saved to: " + filePath);
+        } catch (IOException e) {
+            System.err.println("Error saving chart: " + e.getMessage());
+        }
+    }
+
 }
