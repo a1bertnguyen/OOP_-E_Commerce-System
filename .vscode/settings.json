@@ -3,5 +3,7 @@
     "java.project.outputPath": "bin",
     "java.project.referencedLibraries": [
         "lib/**/*.jar"
-    ]
+    ],
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.autobuild.enabled": true 
 }

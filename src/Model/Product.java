@@ -40,7 +40,17 @@ public class Product {
     public String getProId() {
         return proId;
     }
+    public String getProModel() {
+        return proModel;
+    }
 
+    public String getProCategory() {
+        return proCategory;
+    }
+    public double getProRawPrice() {
+        return proRawPrice;
+    }
+    
     public String getProName() {
         return proName;
     }
