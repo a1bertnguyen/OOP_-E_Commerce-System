@@ -1,7 +1,7 @@
 import java.util.List;
 import java.util.Scanner;
 
-public class IOInterface {
+public class  IOInterface {
     private static IOInterface instance;
     private Scanner scanner;
 
