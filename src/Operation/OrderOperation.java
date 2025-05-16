@@ -1,27 +1,23 @@
 package Operation;
 
+import Model.Order;
+import Model.OrderListResult;
+import Model.Product;
+
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.text.SimpleDateFormat;
+import java.time.Month;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartFrame;
 import org.jfree.chart.ChartUtils;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.data.category.DefaultCategoryDataset;
-
-import Model.Order;
-import Model.OrderListResult;
-import Model.Product;
 import util.FileUtil;
 import util.SimpleJsonParser;
-
-import java.time.Month;
 
 
 public class OrderOperation {
@@ -100,30 +96,32 @@ public class OrderOperation {
         orderId += randomNum;
         return orderId; 
     }
-    /**
-    * Creates a new order with a unique order id and saves it to the
-    * data/orders.txt file.
-    * @param customerId The ID of the customer making the order
-    * @param productId The ID of the product being ordered
-    * @param createTime The time of order creation (null for current time)
-    * @return true if successful, false otherwise
-    */
+
+    private String getCurrentFormattedTime() {
+        return new SimpleDateFormat("dd-MM-yyyy_HH:mm:ss").format(new Date());
+    }
+
     public boolean createAnOrder(String customerId, String productId, String createTime) {
-        String orderId = generateUniqueOrderId();
-        String time = createTime != null ? createTime : java.time.LocalDateTime.now().toString();
-        List<String> updatedLines = new ArrayList<>();
+        String orderId = generateUniqueOrderId(); 
+        String time;
+
+        if (createTime != null && !createTime.trim().isEmpty()) {
+            time = createTime;
+        } else {
+            time = getCurrentFormattedTime(); 
+        }
 
         Order newOrder = new Order(orderId, customerId, productId, time);
         
-        updatedLines.add(newOrder.toString());
         List<String> linesToAdd = new ArrayList<>();
         linesToAdd.add(newOrder.toString());
         try {
-            FileUtil.writeLines(FileUtil.DATA_FILE, linesToAdd, true);
-            reloadOrdersFromFile();
+            FileUtil.writeLines(FileUtil.DATA_FILE, linesToAdd, true); 
+            reloadOrdersFromFile(); 
+            System.out.println("Order " + orderId + " created successfully.");
             return true;
         } catch (Exception e) {
-            System.err.println("Failed to create order: " + e.getMessage());
+            System.err.println("Fail created: " + e.getMessage());
             return false;
         }
     }
@@ -163,20 +161,37 @@ public class OrderOperation {
     */
     public OrderListResult getOrderList(String customerId, int pageNumber) {
         List<Order> customerOrders = orders.stream()
-                                    .filter(order -> order.getUserId().equals(customerId))
-                                    .collect(Collectors.toList());
+                .filter(order -> order != null && order.getUserId() != null && order.getUserId().equals(customerId))
+                .collect(Collectors.toList());
 
         int pageSize = 10;
         int totalOrders = customerOrders.size();
         int totalPages = (int) Math.ceil((double) totalOrders / pageSize);
 
-        if (pageNumber < 1) pageNumber = 1;
-        if (pageNumber > totalPages) pageNumber = totalPages;
+        List<Order> pageData = new ArrayList<>();
+
+        if (totalOrders == 0) {
+            return new OrderListResult(pageData, 0, 0);
+        }
+
+        if (pageNumber < 1) {
+            pageNumber = 1;
+        }
+        if (pageNumber > totalPages) {
+            pageNumber = totalPages;
+        }
 
         int fromIndex = (pageNumber - 1) * pageSize;
         int toIndex = Math.min(fromIndex + pageSize, totalOrders);
 
-        List<Order> pageData = customerOrders.subList(fromIndex, toIndex);
+        if (fromIndex >= 0 && fromIndex < totalOrders) { // Đảm bảo fromIndex hợp lệ
+            // Chỉ gọi subList nếu toIndex không nhỏ hơn fromIndex
+            if (toIndex >= fromIndex) {
+                pageData = customerOrders.subList(fromIndex, toIndex);
+            }
+        } else if (totalOrders > 0 && fromIndex >= totalOrders) {
+            pageNumber = totalPages;
+        }
 
         return new OrderListResult(pageData, pageNumber, totalPages);
     }
@@ -188,22 +203,48 @@ public class OrderOperation {
     */
     public void generateTestOrderData() {
         List<String> lines = new ArrayList<>();
-        for (int i = 1; i <= 10; i++) {
-            String customerId = "c_" + i;
-            int numberOfOrders = (int)(Math.random() * 151 + 50); // 50-200
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy_HH:mm:ss"); 
+        Calendar cal = Calendar.getInstance();
+        
+        Set<String> existingOrderIds = getAllOrdersFromFile().stream()
+                                         .map(Order::getOrderId)
+                                         .collect(Collectors.toSet());
+        Set<String> generatedInThisBatch = new HashSet<>(); 
+
+        for (int i = 1; i <= 10; i++) { 
+            String customerId = "u_testcust" + String.format("%02d", i); 
+            int numberOfOrders = (int) (Math.random() * 151 + 50); 
 
             for (int j = 0; j < numberOfOrders; j++) {
-                String orderId = generateUniqueOrderId();
-                String productId = "p_" + ((int)(Math.random() * 100)); // giả định có p_0 -> p_99
-                int month = (int)(Math.random() * 12 + 1); // tháng 1-12
-                int day = (int)(Math.random() * 28 + 1);
-                String orderTime = String.format("2024-%02d-%02dT12:00:00", month, day);
+                String orderId;
+                do { 
+                    orderId = "o_";
+                    int randomNum = (int) (Math.random() * 90000) + 10000;
+                    orderId += randomNum;
+                } while (existingOrderIds.contains(orderId) || generatedInThisBatch.contains(orderId));
+                generatedInThisBatch.add(orderId);
+
+                String productId = "p" + String.format("%03d", (int) (Math.random() * 20 + 1));
+
+                int year = Calendar.getInstance().get(Calendar.YEAR); 
+                int monthCal = (int) (Math.random() * 12); 
+                int dayOfMonth = (int) (Math.random() * 28 + 1); 
+                int hour = (int) (Math.random() * 24);
+                int minute = (int) (Math.random() * 60);
+                int second = (int) (Math.random() * 60);
+
+                cal.set(year, monthCal, dayOfMonth, hour, minute, second);
+                String orderTime = sdf.format(cal.getTime());
 
                 Order order = new Order(orderId, customerId, productId, orderTime);
                 lines.add(order.toString());
             }
         }
-        FileUtil.writeLines(FileUtil.DATA_FILE, lines, false); // ghi đè để làm mới
+
+        System.out.println("Repair to write " + lines.size() + " test order line...");
+        FileUtil.writeLines(FileUtil.DATA_FILE, lines, false); 
+        System.out.println(lines.size() + " test orders created " + FileUtil.DATA_FILE);
+        reloadOrdersFromFile(); 
     }
 
     /**
@@ -211,117 +252,117 @@ public class OrderOperation {
     * across 12 different months for the given customer.
     * @param customerId The ID of the customer
     */
-    public void generateSingleCustomerConsumptionFigure(String customerId) {
-        Map<Integer, Double> monthToSpending = new HashMap<>();
-        for (int i = 1; i <= 12; i++) monthToSpending.put(i, 0.0);
+     public void generateSingleCustomerConsumptionFigure(String customerId) {
+         Map<Integer, Double> monthToSpending = new HashMap<>();
+         for (int i = 1; i <= 12; i++) monthToSpending.put(i, 0.0);
 
-        for (Order order : orders) {
-            if (order.getUserId().equals(customerId)) {
-                int month = Integer.parseInt(order.getOrderTime().substring(3, 5));
-                Product product = getProductById(order.getProId());
-                if (product != null) {
-                    double currentTotal = monthToSpending.get(month);
-                    monthToSpending.put(month, currentTotal + product.getProCurrentPrice());
-                }
-            }
-        }
+         for (Order order : orders) {
+             if (order.getUserId().equals(customerId)) {
+                 int month = Integer.parseInt(order.getOrderTime().substring(3, 5));
+                 Product product = getProductById(order.getProId());
+                 if (product != null) {
+                     double currentTotal = monthToSpending.get(month);
+                     monthToSpending.put(month, currentTotal + product.getProCurrentPrice());
+                 }
+             }
+         }
 
-        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        for (int i = 1; i <= 12; i++) {
-            dataset.addValue(monthToSpending.get(i), "Consumption", Month.of(i).name());
-        }
+         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+         for (int i = 1; i <= 12; i++) {
+             dataset.addValue(monthToSpending.get(i), "Consumption", Month.of(i).name());
+         }
 
-        JFreeChart chart = ChartFactory.createBarChart(
-            "Monthly Consumption for Customer " + customerId,
-            "Month", "Amount ($)", dataset, PlotOrientation.VERTICAL,
-            false, true, false);
+         JFreeChart chart = ChartFactory.createBarChart(
+             "Monthly Consumption for Customer " + customerId,
+             "Month", "Amount ($)", dataset, PlotOrientation.VERTICAL,
+             false, true, false);
 
-        saveChartToFile(chart, "Single Customer Consumption");
-    }
-
-
-    /**
-    * Generates a chart showing the consumption (sum of order prices)
-    * across 12 different months for all customers.
-    */
-    public void generateAllCustomersConsumptionFigure() {
-        Map<Integer, Double> monthToSpending = new HashMap<>();
-        for (int i = 1; i <= 12; i++) monthToSpending.put(i, 0.0);
-
-        for (Order order : orders) {
-            int month = Integer.parseInt(order.getOrderTime().substring(3, 5));
-            Product product = getProductById(order.getProId());
-            if (product != null) {
-                double currentTotal = monthToSpending.get(month);
-                monthToSpending.put(month, currentTotal + product.getProCurrentPrice());
-            }
-        }
-
-        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        for (int i = 1; i <= 12; i++) {
-            dataset.addValue(monthToSpending.get(i), "Total Consumption", Month.of(i).name());
-        }
-
-        JFreeChart chart = ChartFactory.createLineChart(
-            "Monthly Consumption of All Customers",
-            "Month", "Amount ($)", dataset, PlotOrientation.VERTICAL,
-            false, true, false);
-
-        saveChartToFile(chart, "All Customers Consumption");
-    }
+         saveChartToFile(chart, "Single Customer Consumption");
+     }
 
 
-    /**
-    * Generates a graph showing the top 10 best-selling products
-    * sorted in descending order.
-    */
-    public void generateAllTop10BestSellersFigure() {
-        Map<String, Integer> productSales = new HashMap<>();
-        for (Order order : orders) {
-            productSales.put(order.getProId(), productSales.getOrDefault(order.getProId(), 0) + 1);
-        }
+     /**
+     * Generates a chart showing the consumption (sum of order prices)
+     * across 12 different months for all customers.
+     */
+     public void generateAllCustomersConsumptionFigure() {
+         Map<Integer, Double> monthToSpending = new HashMap<>();
+         for (int i = 1; i <= 12; i++) monthToSpending.put(i, 0.0);
 
-        List<Map.Entry<String, Integer>> sorted = productSales.entrySet().stream()
-            .sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue()))
-            .limit(10)
-            .collect(Collectors.toList());
+         for (Order order : orders) {
+             int month = Integer.parseInt(order.getOrderTime().substring(3, 5));
+             Product product = getProductById(order.getProId());
+             if (product != null) {
+                 double currentTotal = monthToSpending.get(month);
+                 monthToSpending.put(month, currentTotal + product.getProCurrentPrice());
+             }
+         }
 
-        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        for (Map.Entry<String, Integer> entry : sorted) {
-            Product product = getProductById(entry.getKey());
-            if (product != null) {
-                dataset.addValue(entry.getValue(), "Sales", product.getProName());
-            }
-        }
+         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+         for (int i = 1; i <= 12; i++) {
+             dataset.addValue(monthToSpending.get(i), "Total Consumption", Month.of(i).name());
+         }
 
-        JFreeChart chart = ChartFactory.createBarChart(
-            "Top 10 Best-Selling Products",
-            "Product", "Units Sold", dataset, PlotOrientation.VERTICAL,
-            false, true, false);
+         JFreeChart chart = ChartFactory.createLineChart(
+             "Monthly Consumption of All Customers",
+             "Month", "Amount ($)", dataset, PlotOrientation.VERTICAL,
+             false, true, false);
 
-        saveChartToFile(chart, "Top 10 Best Sellers");
-    }
+         saveChartToFile(chart, "All Customers Consumption");
+     }
 
-    private Product getProductById(String id) {
-        for (Product p : products) {
-            if (p.getProId().equals(id)) return p;
-        }
-        return null;
-    }
 
-    public void saveChartToFile(JFreeChart chart, String fileName) {
-        try {
-            File dir = new File("data/figure");
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            File file = new File(dir, fileName + ".png");
-            ChartUtils.saveChartAsPNG(file, chart, 800, 600);
-            System.out.println("Chart saved to: " + file.getAbsolutePath());
-        } catch (IOException e) {
-            System.err.println("Error saving chart: " + e.getMessage());
-        }
-    }
+     /**
+     * Generates a graph showing the top 10 best-selling products
+     * sorted in descending order.
+     */
+     public void generateAllTop10BestSellersFigure() {
+         Map<String, Integer> productSales = new HashMap<>();
+         for (Order order : orders) {
+             productSales.put(order.getProId(), productSales.getOrDefault(order.getProId(), 0) + 1);
+         }
+
+         List<Map.Entry<String, Integer>> sorted = productSales.entrySet().stream()
+             .sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue()))
+             .limit(10)
+             .collect(Collectors.toList());
+
+         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+         for (Map.Entry<String, Integer> entry : sorted) {
+             Product product = getProductById(entry.getKey());
+             if (product != null) {
+                 dataset.addValue(entry.getValue(), "Sales", product.getProName());
+             }
+         }
+
+         JFreeChart chart = ChartFactory.createBarChart(
+             "Top 10 Best-Selling Products",
+             "Product", "Units Sold", dataset, PlotOrientation.VERTICAL,
+             false, true, false);
+
+         saveChartToFile(chart, "Top 10 Best Sellers");
+     }
+
+     private Product getProductById(String id) {
+         for (Product p : products) {
+             if (p.getProId().equals(id)) return p;
+         }
+         return null;
+     }
+
+     public void saveChartToFile(JFreeChart chart, String fileName) {
+         try {
+             File dir = new File("data/figure");
+             if (!dir.exists()) {
+                 dir.mkdirs();
+             }
+             File file = new File(dir, fileName + ".png");
+             ChartUtils.saveChartAsPNG(file, chart, 800, 600);
+             System.out.println("Chart saved to: " + file.getAbsolutePath());
+         } catch (IOException e) {
+             System.err.println("Error saving chart: " + e.getMessage());
+         }
+     }
 
     /**
     * Removes all data in the data/orders.txt file.
@@ -329,14 +370,24 @@ public class OrderOperation {
     public void deleteAllOrders() {
         List<String> allLines = FileUtil.readLines(FileUtil.DATA_FILE);
         List<String> remainingLines = new ArrayList<>();
+        int ordersDeletedCount = 0;
 
         for (String line : allLines) {
-            if (!line.contains("\"order_id\":")) {
+            
+            if (!line.contains("\"order_id\":")) { 
                 remainingLines.add(line);
+            } else {
+                ordersDeletedCount++;
             }
         }
 
-        FileUtil.writeLines(FileUtil.DATA_FILE, remainingLines, false);
+        if (ordersDeletedCount > 0) {
+            FileUtil.writeLines(FileUtil.DATA_FILE, remainingLines, false);
+            System.out.println("Remove successful " + ordersDeletedCount + " orders.");
+        } else {
+            System.out.println("Can not find any orders to remove.");
+        }
+        reloadOrdersFromFile(); 
     }
 
 }

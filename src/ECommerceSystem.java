@@ -1,6 +1,7 @@
-import Operation.*;
 import Model.*;
+import Operation.*;
 import java.util.List;
+import util.FileUtil;
 
 public class ECommerceSystem {
     private static IOInterface ioInterface;
@@ -20,6 +21,8 @@ public class ECommerceSystem {
         customerOperation = CustomerOperation.getInstance();
         productOperation = ProductOperation.getInstance();
         orderOperation = OrderOperation.getInstance();
+
+        FileUtil.ensureDataFileExists();
         
         // Main application loop
         boolean running = true;
@@ -99,9 +102,9 @@ public class ECommerceSystem {
                 case "5":
                     generateTestData();
                     break;
-                case "6":
-                    generateAllStatisticalFigures();
-                    break;
+                 case "6":
+                     generateAllStatisticalFigures();
+                     break;
                 case "7":
                     deleteAllData();
                     break;
@@ -140,9 +143,9 @@ public class ECommerceSystem {
                 case "4":
                     showCustomerOrders();
                     break;
-                case "5":
-                    generateCustomerConsumptionFigures();
-                    break;
+                 case "5":
+                     generateCustomerConsumptionFigures();
+                     break;
                 case "6":
                     customerRunning = false;
                     currentUser = null;
@@ -251,21 +254,21 @@ public class ECommerceSystem {
         ioInterface.printMessage("Test data generated successfully!");
     }
     
-    private static void generateAllStatisticalFigures() {
-        ioInterface.printMessage("Generating all statistical figures...");
+     private static void generateAllStatisticalFigures() {
+         ioInterface.printMessage("Generating all statistical figures...");
         
-        // Product figures
-        productOperation.generateCategoryFigure();
-        productOperation.generateDiscountFigure();
-        productOperation.generateLikesCountFigure();
-        productOperation.generateDiscountLikesCountFigure();
+         // Product figures
+         productOperation.generateCategoryFigure();
+         productOperation.generateDiscountFigure();
+         productOperation.generateLikesCountFigure();
+         productOperation.generateDiscountLikesCountFigure();
         
-        // Order figures
-        orderOperation.generateAllCustomersConsumptionFigure();
-        orderOperation.generateAllTop10BestSellersFigure();
+         // Order figures
+         orderOperation.generateAllCustomersConsumptionFigure();
+         orderOperation.generateAllTop10BestSellersFigure();
         
-        ioInterface.printMessage("All statistical figures generated successfully!");
-    }
+         ioInterface.printMessage("All statistical figures generated successfully!");
+     }
     
     private static void deleteAllData() {
         String[] confirmation = ioInterface.getUserInput("Are you sure you want to delete all data? (yes/no):", 1);
@@ -310,20 +313,20 @@ public class ECommerceSystem {
             ioInterface.printMessage("No products found containing \"" + keyword + "\"");
         }
     }
-    
+
     private static void showCustomerOrders() {
         int currentPage = 1;
         boolean viewing = true;
-        
+
         while (viewing) {
             OrderListResult result = orderOperation.getOrderList(currentUser.getUserId(), currentPage);
-            ioInterface.showList(currentUser.getUserRole(), "Order", result.getOrders(), 
-                              result.getCurrentPage(), result.getTotalPages());
-            
-            if (result.getTotalPages() > 0) {
+            ioInterface.showList(currentUser.getUserRole(), "Order", result.getOrders(),
+                    result.getCurrentPage(), result.getTotalPages());
+
+            if (result.getTotalPages() > 0 && (result.getOrders() != null && !result.getOrders().isEmpty()) ) {
                 ioInterface.printMessage("Page " + result.getCurrentPage() + " of " + result.getTotalPages());
                 String[] input = ioInterface.getUserInput("Enter 'n' for next page, 'p' for previous page, or 'b' to go back:", 1);
-                
+
                 switch (input[0].toLowerCase()) {
                     case "n":
                         if (currentPage < result.getTotalPages()) {
@@ -351,9 +354,9 @@ public class ECommerceSystem {
         }
     }
     
-    private static void generateCustomerConsumptionFigures() {
-        ioInterface.printMessage("Generating customer consumption figures...");
-        orderOperation.generateSingleCustomerConsumptionFigure(currentUser.getUserId());
-        ioInterface.printMessage("Customer consumption figures generated successfully!");
-    }
+     private static void generateCustomerConsumptionFigures() {
+         ioInterface.printMessage("Generating customer consumption figures...");
+         orderOperation.generateSingleCustomerConsumptionFigure(currentUser.getUserId());
+         ioInterface.printMessage("Customer consumption figures generated successfully!");
+     }
 }

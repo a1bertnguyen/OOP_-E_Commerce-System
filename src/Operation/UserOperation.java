@@ -3,7 +3,6 @@ package Operation;
 import Model.*;
 import java.util.*;
 import java.util.stream.Collectors;
-
 import util.FileUtil; 
 import util.SimpleJsonParser;
 
@@ -29,7 +28,7 @@ public class UserOperation {
         return FileUtil.readLines(FileUtil.DATA_FILE);
     }
 
-    // Take list Users
+//     Take list Users
     public List<User> getAllUsers() {
         List<String> allLines = loadAllLinesFromFile();
         List<User> users = new ArrayList<>();
@@ -53,6 +52,73 @@ public class UserOperation {
         }
         return users;
     }
+
+    // Trong UserOperation.java
+//    public List<User> getAllUsers() {
+//        List<String> allLines = loadAllLinesFromFile();
+//        System.err.println("DEBUG getAllUsers: Number of lines loaded from file by loadAllLinesFromFile(): " + allLines.size()); // Thêm DEBUG
+//
+//        List<User> users = new ArrayList<>();
+//        if (allLines.isEmpty()) {
+//            System.err.println("DEBUG getAllUsers: allLines is empty. No data to parse."); // Thêm DEBUG
+//            return users; // Trả về danh sách rỗng nếu không có dòng nào để đọc
+//        }
+//
+//        int linesProcessed = 0;
+//        int usersParsed = 0;
+//
+//        for (String line : allLines) {
+//            linesProcessed++;
+//            System.err.println("DEBUG getAllUsers: Processing line " + linesProcessed + ": [" + line + "]"); // Thêm DEBUG
+//
+//            if (line.trim().isEmpty()) { // Bỏ qua dòng trống
+//                System.err.println("DEBUG getAllUsers: Skipping empty line.");
+//                continue;
+//            }
+//
+//            // Điều kiện xác định dòng user
+//            boolean isUserLineCandidate = line.contains("\"user_id\":") && line.contains("\"user_name\":");
+//            System.err.println("DEBUG getAllUsers: Is user line candidate? " + isUserLineCandidate); // Thêm DEBUG
+//
+//            if (isUserLineCandidate) {
+//                Map<String, String> data = SimpleJsonParser.parse(line);
+//                System.err.println("DEBUG getAllUsers: Parsed JSON-like data: " + data); // Thêm DEBUG
+//
+//                if (!data.isEmpty()) {
+//                    String role = data.getOrDefault("user_role", "customer").toLowerCase();
+//                    System.err.println("DEBUG getAllUsers: Detected role: " + role); // Thêm DEBUG
+//                    try {
+//                        User parsedUser = null;
+//                        if ("admin".equals(role)) {
+//                            parsedUser = parseAdmin(data);
+//                        } else {
+//                            parsedUser = parseCustomer(data);
+//                        }
+//
+//                        if (parsedUser != null) {
+//                            users.add(parsedUser);
+//                            usersParsed++;
+//                            System.err.println("DEBUG getAllUsers: Successfully parsed and added user: " + parsedUser.getUserName()); // Thêm DEBUG
+//                        } else {
+//                            System.err.println("DEBUG getAllUsers: parseAdmin/parseCustomer returned null for data: " + data); // Thêm DEBUG
+//                        }
+//                    } catch (IllegalArgumentException e) {
+//                        System.err.println("DEBUG getAllUsers: IllegalArgumentException parsing user line: " + line + " - Error: " + e.getMessage());
+//                    } catch (Exception e) {
+//                        System.err.println("DEBUG getAllUsers: Unexpected Exception parsing user line: " + line + " - Error: " + e.getMessage());
+//                        e.printStackTrace(); // In stack trace cho lỗi không mong muốn
+//                    }
+//                } else {
+//                    System.err.println("DEBUG getAllUsers: SimpleJsonParser.parse(line) returned empty map for line: " + line); // Thêm DEBUG
+//                }
+//            }
+//        }
+//        System.err.println("DEBUG getAllUsers: Finished processing. Total lines processed: " + linesProcessed + ". Total users parsed and added: " + usersParsed); // Thêm DEBUG
+//        if (users.isEmpty() && linesProcessed > 0) {
+//            System.err.println("DEBUG getAllUsers: Processed " + linesProcessed + " lines but no users were successfully parsed and added to the list!");
+//        }
+//        return users;
+//    }
     
     // RES: https://www.geeksforgeeks.org/java-io-bufferedreader-class-java/
     public String generateUniqueUserId() {
@@ -149,21 +215,69 @@ public class UserOperation {
         return false;
     }
 
-    public User login(String userName, String userPassword) {
-        if (userName == null || userPassword == null) return null;
-        List<User> users = getAllUsers();
-        for (User user : users) {
-            if (user.getUserName().equalsIgnoreCase(userName)) {
-                String storedDecryptedPassword = decryptPassword(user.getUserPassword());
-                if (storedDecryptedPassword != null && storedDecryptedPassword.equals(userPassword)) {
-                    return user;
-                } else {
-                    return null;
-                }
-            }
-        }
-        return null; 
-    }
+     public User login(String userName, String userPassword) {
+         if (userName == null || userPassword == null) return null;
+         List<User> users = getAllUsers();
+         for (User user : users) {
+             if (user.getUserName().equalsIgnoreCase(userName)) {
+                 String storedDecryptedPassword = decryptPassword(user.getUserPassword());
+                 if (storedDecryptedPassword != null && storedDecryptedPassword.equals(userPassword)) {
+                     return user;
+                 } else {
+                     return null;
+                 }
+             }
+         }
+         return null;
+     }
+
+//    public User login(String userName, String userPassword) {
+//        // Đề xuất kiểm tra đầu vào nghiêm ngặt hơn
+//        if (userName == null || userName.trim().isEmpty() ||
+//            userPassword == null || userPassword.trim().isEmpty()) { // Kiểm tra cả userPassword rỗng
+//            System.err.println("DEBUG: Login attempt with empty username or password.");
+//            return null;
+//        }
+//
+//        List<User> users = getAllUsers();
+//        if (users.isEmpty()) {
+//            System.err.println("DEBUG: No users loaded from file.");
+//            return null;
+//        }
+//
+//        for (User user : users) {
+//            // Nên trim() userName lấy từ file nếu có khả năng nó có khoảng trắng thừa
+//            if (user.getUserName().equalsIgnoreCase(userName.trim())) { // Trim userName từ input
+//                String storedEncryptedPassword = user.getUserPassword();
+//                String storedDecryptedPassword = decryptPassword(storedEncryptedPassword);
+//
+//                // Debugging output
+//                System.err.println("DEBUG: Attempting login for: " + userName.trim());
+//                System.err.println("DEBUG: User from file: " + user.getUserName());
+//                System.err.println("DEBUG: Input password: [" + userPassword + "]"); // userPassword ở đây là mật khẩu gốc người dùng nhập
+//                System.err.println("DEBUG: Stored encrypted: [" + storedEncryptedPassword + "]");
+//                System.err.println("DEBUG: Stored decrypted: [" + storedDecryptedPassword + "]");
+//
+//                if (storedDecryptedPassword != null && storedDecryptedPassword.equals(userPassword)) {
+//                    System.err.println("DEBUG: Password match! Login successful for " + userName.trim());
+//                    return user;
+//                } else {
+//                    // LỖI LOGIC TIỀM NĂNG Ở ĐÂY:
+//                    // Nếu mật khẩu không khớp cho user đầu tiên có username trùng,
+//                    // bạn trả về null ngay lập tức mà không kiểm tra các user khác
+//                    // (dù trường hợp có nhiều user cùng username là không nên có).
+//                    // Tuy nhiên, nếu chỉ có một user với username đó, thì return null là đúng.
+//                    // Nếu bạn đảm bảo username là duy nhất, thì logic này là ổn.
+//                    System.err.println("DEBUG: Password mismatch for " + userName.trim());
+//                    // return null; // BỎ return null ở đây nếu bạn muốn nó tiếp tục vòng lặp (dù ít có khả năng)
+//                                // Giữ lại nếu username là duy nhất.
+//                }
+//            }
+//        }
+//        // Chỉ trả về null sau khi đã duyệt qua tất cả user mà không tìm thấy khớp username VÀ password
+//        System.err.println("DEBUG: User " + userName.trim() + " not found or password did not match.");
+//        return null;
+//    }
 
     /*
      * {"user_id":"u_123","user_name":"minh"}
@@ -183,7 +297,7 @@ public class UserOperation {
     }
 
     private Customer parseCustomer(Map<String, String> data) {
-         String userId = data.get("user_id");
+        String userId = data.get("user_id");
         String userName = data.get("user_name");
         String password = data.get("user_password");
         String regTime = data.get("user_register_time");

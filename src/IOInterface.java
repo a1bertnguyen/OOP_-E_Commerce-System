@@ -103,17 +103,27 @@ public class  IOInterface {
      * @param pageNumber The current page number
      * @param totalPages The total number of pages
      */
+    // In IOInterface.java
     public void showList(String userRole, String listType, List<?> objectList,
-                         int pageNumber, int totalPages) {
-        System.out.printf("=== %s List (Page %d/%d) ===\n", listType, pageNumber, totalPages);
-        int start = (pageNumber - 1) * 10;
-        int end = Math.min(start + 10, objectList.size());
-        for (int i = start; i < end; i++) {
-            System.out.printf("%d. %s\n", i + 1, objectList.get(i).toString());
+                        int pageNumber, int totalPages) {
+        System.out.printf("====== %s List (Page %d/%d) ======\n", listType, pageNumber, totalPages);
+        
+        // Handle cases where there's no data or the current page is invalid/empty
+        if (totalPages == 0) { // Implies no data at all for this list type
+            System.out.println("No " + listType.toLowerCase() + " data found in the system.");
+        } else if (objectList.isEmpty()) {
+            System.out.println("No " + listType.toLowerCase() + " to display on this page.");
+            if (pageNumber > totalPages || pageNumber < 1 && totalPages > 0) {
+                System.out.println("Tip: Page number might be out of valid range (1-" + totalPages + ").");
+            }
+        } else {
+            final int PAGE_SIZE = 10; // This should ideally be a shared constant
+            int baseItemNumber = (pageNumber - 1) * PAGE_SIZE;
+            for (int i = 0; i < objectList.size(); i++) {
+                System.out.printf("%d. %s\n", baseItemNumber + i + 1, objectList.get(i).toString());
+            }
         }
-        if (objectList.isEmpty()) {
-            System.out.println("No " + listType + " to display.");
-        }
+        System.out.println("==========================================");
     }
 
     /**
