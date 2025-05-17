@@ -22,7 +22,7 @@ public class FileUtil {
         }
 
         try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) { // Explicitly use UTF-8
-            System.err.println("DEBUG FileUtil: Successfully opened file for reading: " + filePathStr);
+
             String line;
             boolean firstLine = true;
             int lineCount = 0;
@@ -36,20 +36,12 @@ public class FileUtil {
                 lines.add(line);
                 firstLine = false;
             }
-            System.err.println("DEBUG FileUtil: Finished reading file. Total lines read: " + lineCount + ". Lines added to list: " + lines.size());
+
         } catch (IOException e) {
             System.err.println("Failed to read file " + filePathStr + ". Ensure it is UTF-8 encoded. Error details: " + e.toString());
             // e.printStackTrace(); // Uncomment for full stack trace during development
         }
-        if (lines.isEmpty() && Files.exists(filePath)) {
-            try {
-                if (Files.size(filePath) > 0) {
-                    System.err.println("DEBUG FileUtil: File exists and is not empty, but readLines returned an empty list. Possible parsing or logic error within readLines.");
-                } else {
-                    System.err.println("DEBUG FileUtil: File exists but is empty.");
-                }
-            } catch (IOException ignored) {}
-        }
+
         return lines;
     }
 
